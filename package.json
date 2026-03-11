@@ -4,7 +4,8 @@
   "description": "Lightweight static site with design tokens and Markdown CMS",
   "scripts": {
     "build": "node build.js",
-    "dev": "node build.js --watch"
+    "lint": "node scripts/lint.js",
+    "lint:build": "npm run build && npm run lint"
   },
   "dependencies": {
     "marked": "^12.0.0",
