@@ -3,48 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Acme Corpへのお問い合わせはこちらから。">
   <title>お問い合わせ | Acme Corp</title>
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <header class="site-header">
-    <div class="container">
-      <div class="site-header__inner">
-        <a href="index.html" class="site-header__logo">Acme Corp</a>
-        <nav class="site-nav">
-          <ul class="site-nav__list">
-            <li><a href="about.html" class="site-nav__link">会社概要</a></li>
-            <li><a href="contact.html" class="site-nav__link">お問い合わせ</a></li>
-          </ul>
-        </nav>
-        <a href="contact.html" class="btn btn--primary">お問い合わせ</a>
-      </div>
+  <div class="container">
+    <div class="site-header__inner">
+      <a href="index.html" class="site-header__logo">Acme Corp</a>
+      <nav class="site-nav" aria-label="main navigation">
+        <ul class="site-nav__list">
+          <li><a href="about.html" class="site-nav__link">会社概要</a></li><li><a href="contact.html" class="site-nav__link">お問い合わせ</a></li>
+        </ul>
+      </nav>
+      <a href="contact.html" class="btn btn--primary">お問い合わせ</a>
     </div>
-  </header>
-  <main>
+  </div>
+</header>
+
+  <main id="main">
+    
     <section class="section">
       <div class="container">
-        <h1>お問い合わせ</h1>
-        <p class="page-lead">ご質問・ご相談はお気軽にどうぞ。</p>
-        <div class="page-body">
-          <ul>
-            <li><strong>Email</strong>: hello@acme-corp.example</li>
-            <li><strong>Tel</strong>: 03-0000-0000</li>
-            <li><strong>所在地</strong>: 東京都渋谷区〒001-2-3</li>
-          </ul>
-        </div>
+        <div class="page-body"><h1>お問い合わせ</h1>
+<ul>
+<li><strong>Email</strong>: hello@acme-corp.example</li>
+<li><strong>Tel</strong>: 03-0000-0000</li>
+<li><strong>所在地</strong>: 東京都渋谷区〒001-2-3</li>
+</ul>
+</div>
       </div>
     </section>
   </main>
+
   <footer class="site-footer">
-    <div class="container">
-      <div class="site-footer__inner">
-        <span>© 2025 Acme Corp</span>
-        <ul class="site-footer__nav">
-          <li><a href="contact.html">お問い合わせ</a></li>
-        </ul>
-      </div>
+  <div class="container">
+    <div class="site-footer__inner">
+      <span class="site-footer__copy">© 2025 Acme Corp</span>
+      <ul class="site-footer__nav">
+        <li><a href="contact.html">お問い合わせ</a></li>
+      </ul>
     </div>
-  </footer>
+  </div>
+</footer>
+
 </body>
 </html>
