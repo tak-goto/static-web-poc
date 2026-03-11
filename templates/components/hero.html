@@ -1,16 +1,13 @@
+{{#if_hero}}
 <section class="hero">
   <div class="container">
-    <div class="hero__inner">
-      <div class="hero__copy">
-        <p class="hero__eyebrow">{{eyebrow}}</p>
-        <h1 class="hero__heading">{{heading}}</h1>
-        <p class="hero__lead">{{lead}}</p>
-        <div class="hero__actions">
-          <a href="{{primary_cta_url}}" class="btn btn--primary">{{primary_cta_label}}</a>
-          {{#if secondary_cta_label}}
-          <a href="{{secondary_cta_url}}" class="btn btn--outline">{{secondary_cta_label}}</a>
-          {{/if}}
-        </div>
+    <div class="hero__copy">
+      <p class="hero__eyebrow">{{hero_eyebrow}}</p>
+      <h1 class="hero__heading">{{hero_heading}}</h1>
+      <p class="hero__lead">{{hero_lead}}</p>
+      <div class="hero__actions">
+        <a href="{{hero_primary_cta_url}}" class="btn btn--primary">{{hero_primary_cta_label}}</a>
+        <a href="{{hero_secondary_cta_url}}" class="btn btn--outline">{{hero_secondary_cta_label}}</a>
       </div>
     </div>
   </div>
@@ -48,3 +45,4 @@
   flex-wrap: wrap;
 }
 </style>
+{{/if_hero}}

@@ -3,14 +3,12 @@
   "lang": "ja",
   "copyright": "© 2025 Acme Corp",
   "cta_label": "お問い合わせ",
-  "cta_url": "/contact",
+  "cta_url": "contact.html",
   "nav_items": [
-    { "label": "サービス", "url": "/services" },
-    { "label": "会社概要", "url": "/about" },
-    { "label": "ニュース", "url": "/news" }
+    { "label": "会社概要", "url": "about.html" },
+    { "label": "お問い合わせ", "url": "contact.html" }
   ],
   "footer_links": [
-    { "label": "プライバシーポリシー", "url": "/privacy" },
-    { "label": "お問い合わせ", "url": "/contact" }
+    { "label": "お問い合わせ", "url": "contact.html" }
   ]
 }
