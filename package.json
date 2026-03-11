@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Lightweight static site with design tokens and Markdown CMS",
   "scripts": {
-    "build": "node build.js",
-    "lint": "node scripts/lint.js",
-    "lint:build": "npm run build && npm run lint"
+    "build":   "node build.js",
+    "lint":    "node scripts/lint.js",
+    "preview": "npm run lint && npm run build && npm run lint",
+    "ci":      "npm run lint && npm run build && npm run lint"
   },
   "dependencies": {
     "marked": "^12.0.0",
