@@ -1,12 +1,5 @@
 name: Production — Build & Deploy
 
-# Triggered ONLY on push to production branch.
-# production branch is protected: requires PR + review + no direct push.
-#
-# Future: add environment protection rule with required reviewers
-# (Settings → Environments → production → Required reviewers)
-# to restrict who can approve the deployment gate.
-
 on:
   push:
     branches: [production]
@@ -19,13 +12,15 @@ permissions:
 
 concurrency:
   group: production
-  cancel-in-progress: false   # never cancel a production deploy mid-flight
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-node@v4
         with:
@@ -35,6 +30,29 @@ jobs:
 
       - name: Lint (pre-build)
         run: npm run lint
+
+      # ─── HITL guard (production も同様に適用) ──────────────────────
+      - name: HITL — block direct push of template/design-system changes
+        if: github.event_name == 'push'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '^(templates/|design-system/)' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No template/design-system changes — OK."
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --format=%s)
+          IS_MERGE=$(echo "$COMMIT_MSG" | grep -c '^Merge pull request' || true)
+
+          if [ "$IS_MERGE" -eq 0 ]; then
+            echo "::error::🚫 HITL violation: templates/ or design-system/ were modified in a direct push."
+            echo "$CHANGED" | sed 's/^/::error::  /'
+            echo "::error::Use a PR. See GOVERNANCE.md."
+            exit 1
+          else
+            echo "✓ PR merge detected — template changes allowed."
+          fi
+      # ───────────────────────────────────────────────────────────────
 
       - name: Build
         run: npm run build
@@ -50,7 +68,6 @@ jobs:
         with:
           path: dist
 
-  # Manual approval gate lives here via GitHub Environment protection rules
   deploy:
     needs: build
     runs-on: ubuntu-latest

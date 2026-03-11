@@ -1,8 +1,5 @@
 name: Staging — Build & Deploy
 
-# Triggered on every push to main (feature work merged)
-# Deploys to the 'staging' GitHub Pages environment for preview
-
 on:
   push:
     branches: [main]
@@ -22,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # HEAD~1 diff に必要
 
       - uses: actions/setup-node@v4
         with:
@@ -32,17 +31,38 @@ jobs:
       - name: Lint (pre-build)
         run: npm run lint
 
+      # ─── HITL guard ────────────────────────────────────────────────
+      # templates/ or design-system/ が変更されているとき、
+      # PRマージ経由でなければ即エラーで終了する。
+      # PRマージのコミットメッセージは "Merge pull request #" で始まる。
+      - name: HITL — block direct push of template/design-system changes
+        if: github.event_name == 'push'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '^(templates/|design-system/)' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No template/design-system changes — OK."
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --format=%s)
+          IS_MERGE=$(echo "$COMMIT_MSG" | grep -c '^Merge pull request' || true)
+
+          if [ "$IS_MERGE" -eq 0 ]; then
+            echo "::error::🚫 HITL violation: templates/ or design-system/ were modified in a direct push."
+            echo "::error::Changed files:"
+            echo "$CHANGED" | sed 's/^/::error::  /'
+            echo "::error::These paths require a Pull Request with human review. See GOVERNANCE.md."
+            exit 1
+          else
+            echo "✓ PR merge detected — template changes allowed."
+          fi
+      # ───────────────────────────────────────────────────────────────
+
       - name: Build
         run: npm run build
 
       - name: Lint (post-build — check dist output)
         run: npm run lint
-
-      - name: Check for template changes (HITL warning)
-        run: |
-          git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '^templates/' && \
-            echo '::warning::⚠️ Template files were modified. Human review required before promoting to production.' || \
-            echo 'No template changes detected.'
 
       - uses: actions/upload-pages-artifact@v3
         with:

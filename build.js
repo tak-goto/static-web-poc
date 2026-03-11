@@ -1,5 +1,6 @@
-const fs   = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 const { marked } = require('marked');
 const fm         = require('front-matter');
 
@@ -10,6 +11,11 @@ const DIST_DIR     = path.join(__dirname, 'dist');
 
 function readFile(p) { return fs.readFileSync(p, 'utf8'); }
 function ensureDir(p) { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); }
+
+// CSS の内容から 8文字のハッシュを生成 — キャッシュバスティング用
+function cssFingerprint(css) {
+  return crypto.createHash('sha256').update(css).digest('hex').slice(0, 8);
+}
 
 function flatten(obj, prefix, result) {
   prefix = prefix || '';
@@ -63,13 +69,15 @@ function buildCSS() {
   return tokens + '\n' + base;
 }
 
-function renderPage(contentPath, siteData) {
+function renderPage(contentPath, siteData, cssVersion) {
   var raw    = readFile(contentPath);
   var parsed = fm(raw);
   var flat   = flatten(parsed.attributes);
   var pageData = Object.assign({}, siteData, parsed.attributes, flat);
   pageData.page_title = pageData.title || pageData.site_name;
   pageData.body_html  = marked.parse(parsed.body);
+  // CSS参照にバージョンクエリを付与
+  pageData.css_url    = 'assets/style.css?v=' + cssVersion;
 
   var html = readFile(path.join(TEMPLATE_DIR, 'base.html'));
   html = html.replace('{{> content}}', '<div class="page-body">' + pageData.body_html + '</div>');
@@ -86,18 +94,20 @@ function build() {
 
   var siteData = JSON.parse(readFile(path.join(CONTENT_DIR, 'site.json')));
 
-  fs.writeFileSync(path.join(DIST_DIR, 'assets', 'style.css'), buildCSS());
-  console.log('  v dist/assets/style.css');
+  var css = buildCSS();
+  var cssVersion = cssFingerprint(css);
+  fs.writeFileSync(path.join(DIST_DIR, 'assets', 'style.css'), css);
+  console.log('  ✓ dist/assets/style.css  (v=' + cssVersion + ')');
 
-  fs.writeFileSync(path.join(DIST_DIR, 'index.html'), renderPage(path.join(CONTENT_DIR, 'index.md'), siteData));
-  console.log('  v dist/index.html');
+  fs.writeFileSync(path.join(DIST_DIR, 'index.html'), renderPage(path.join(CONTENT_DIR, 'index.md'), siteData, cssVersion));
+  console.log('  ✓ dist/index.html');
 
   fs.readdirSync(path.join(CONTENT_DIR, 'pages')).forEach(function(file) {
     if (!file.endsWith('.md')) return;
-    var html = renderPage(path.join(CONTENT_DIR, 'pages', file), siteData);
+    var html = renderPage(path.join(CONTENT_DIR, 'pages', file), siteData, cssVersion);
     var out  = file.replace('.md', '.html');
     fs.writeFileSync(path.join(DIST_DIR, out), html);
-    console.log('  v dist/' + out);
+    console.log('  ✓ dist/' + out);
   });
 
   console.log('Build complete.');
