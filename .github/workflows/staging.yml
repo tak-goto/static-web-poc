@@ -1,0 +1,59 @@
+name: Staging — Build & Deploy
+
+# Triggered on every push to main (feature work merged)
+# Deploys to the 'staging' GitHub Pages environment for preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: staging
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - name: Lint (pre-build)
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint (post-build — check dist output)
+        run: npm run lint
+
+      - name: Check for template changes (HITL warning)
+        run: |
+          git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '^templates/' && \
+            echo '::warning::⚠️ Template files were modified. Human review required before promoting to production.' || \
+            echo 'No template changes detected.'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

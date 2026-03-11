@@ -1,0 +1,62 @@
+name: Production — Build & Deploy
+
+# Triggered ONLY on push to production branch.
+# production branch is protected: requires PR + review + no direct push.
+#
+# Future: add environment protection rule with required reviewers
+# (Settings → Environments → production → Required reviewers)
+# to restrict who can approve the deployment gate.
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false   # never cancel a production deploy mid-flight
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - name: Lint (pre-build)
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint (post-build)
+        run: npm run lint
+
+      - name: Verify no unresolved placeholders in dist
+        run: |
+          grep -rl '{{' dist/ && echo '::error::Unresolved placeholders found in dist!' && exit 1 || echo 'dist/ is clean.'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # Manual approval gate lives here via GitHub Environment protection rules
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
