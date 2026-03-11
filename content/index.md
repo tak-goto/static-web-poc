@@ -4,8 +4,7 @@ meta_description: Acme Corpの公式サイトです。
 template: home
 hero:
   eyebrow: Welcome
-  heading: 未来をともに、
-  つくる会社
+  heading: "未来をともに、つくる会社"
   lead: Acme Corpはテクノロジーとデザインで、お客様のビジネスを次のステージへ導きます。
   primary_cta_label: サービスを見る
   primary_cta_url: /services
