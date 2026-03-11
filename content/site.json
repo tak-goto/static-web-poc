@@ -5,10 +5,13 @@
   "cta_label": "お問い合わせ",
   "cta_url": "contact.html",
   "nav_items": [
-    { "label": "会社概要", "url": "about.html" },
+    { "label": "サービス",   "url": "services.html" },
+    { "label": "会社概要",   "url": "about.html" },
+    { "label": "ニュース",   "url": "news.html" },
     { "label": "お問い合わせ", "url": "contact.html" }
   ],
   "footer_links": [
-    { "label": "お問い合わせ", "url": "contact.html" }
+    { "label": "プライバシーポリシー", "url": "privacy.html" },
+    { "label": "お問い合わせ",       "url": "contact.html" }
   ]
 }
