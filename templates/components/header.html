@@ -1,0 +1,50 @@
+<header class="site-header">
+  <div class="container">
+    <div class="site-header__inner">
+      <a href="/" class="site-header__logo">{{site_name}}</a>
+      <nav class="site-nav" aria-label="main navigation">
+        <ul class="site-nav__list">
+          {{#each nav_items}}
+          <li><a href="{{url}}" class="site-nav__link">{{label}}</a></li>
+          {{/each}}
+        </ul>
+      </nav>
+      <a href="{{cta_url}}" class="btn btn--primary">{{cta_label}}</a>
+    </div>
+  </div>
+</header>
+
+<style>
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--color-bg);
+  border-bottom: var(--border-thin) solid var(--color-border);
+  padding-block: var(--space-4);
+}
+.site-header__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.site-header__logo {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.site-nav { margin-inline-start: auto; }
+.site-nav__list {
+  display: flex;
+  gap: var(--space-6);
+  list-style: none;
+}
+.site-nav__link {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+.site-nav__link:hover { color: var(--color-accent); }
+</style>

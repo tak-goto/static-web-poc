@@ -1,0 +1,16 @@
+{
+  "site_name": "Acme Corp",
+  "lang": "ja",
+  "copyright": "© 2025 Acme Corp",
+  "cta_label": "お問い合わせ",
+  "cta_url": "/contact",
+  "nav_items": [
+    { "label": "サービス", "url": "/services" },
+    { "label": "会社概要", "url": "/about" },
+    { "label": "ニュース", "url": "/news" }
+  ],
+  "footer_links": [
+    { "label": "プライバシーポリシー", "url": "/privacy" },
+    { "label": "お問い合わせ", "url": "/contact" }
+  ]
+}

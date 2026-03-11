@@ -1,0 +1,13 @@
+{{> base}}
+<!-- page content slot -->
+<section class="section">
+  <div class="container">
+    <div class="page-header">
+      <h1>{{title}}</h1>
+      {{#if lead}}<p class="page-lead">{{lead}}</p>{{/if}}
+    </div>
+    <div class="page-body">
+      {{> body_content}}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,32 @@
+<footer class="site-footer">
+  <div class="container">
+    <div class="site-footer__inner">
+      <span class="site-footer__copy">{{copyright}}</span>
+      <nav aria-label="footer navigation">
+        <ul class="site-footer__nav">
+          {{#each footer_links}}
+          <li><a href="{{url}}">{{label}}</a></li>
+          {{/each}}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<style>
+.site-footer {
+  background-color: var(--color-neutral-900);
+  color: var(--color-neutral-400);
+  padding-block: var(--space-8);
+  font-size: var(--text-sm);
+}
+.site-footer__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.site-footer__nav { display: flex; gap: var(--space-6); list-style: none; }
+.site-footer a { color: var(--color-neutral-400); }
+.site-footer a:hover { color: var(--color-neutral-0); }
+</style>
