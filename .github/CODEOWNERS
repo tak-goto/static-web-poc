@@ -1,15 +1,33 @@
 # CODEOWNERS — Human-in-the-loop enforcement
 #
 # These paths require explicit review/approval before merge.
-# Protects design system and templates from unreviewed changes.
+# Protects infrastructure scripts, design system, templates, and policy docs
+# from unreviewed changes.
 
-# Template changes always require tak-goto's approval
+# ── Templates & design system ─────────────────────────────
+# Changes affect every rendered page.
 templates/                @tak-goto
 templates/components/     @tak-goto
-
-# Design system changes always require tak-goto's approval
 design-system/            @tak-goto
 
-# Workflow changes require approval (prevent privilege escalation)
+# ── Build infrastructure ──────────────────────────────────
+# build.js: controls how all pages are generated (CSS fingerprint,
+#   OGP, sitemap, robots, public/ copy). A single bad line breaks
+#   every page.
+# scripts/: lint.js gates all CI runs. Weakening checks here
+#   silently degrades quality assurance.
+build.js                  @tak-goto
+scripts/                  @tak-goto
+
+# ── CI / CD workflows ─────────────────────────────────────
+# Workflow changes carry privilege-escalation risk.
+# Dependabot PRs targeting these files will also require review,
+# which is intentional — action version bumps should be human-verified.
 .github/workflows/        @tak-goto
 .github/CODEOWNERS        @tak-goto
+
+# ── Policy & governance documents ────────────────────────
+# GOVERNANCE.md and CLAUDE.md define the operating rules for this repo.
+# Weakening them without review defeats the governance model.
+GOVERNANCE.md             @tak-goto
+CLAUDE.md                 @tak-goto
