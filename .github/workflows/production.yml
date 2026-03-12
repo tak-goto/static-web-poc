@@ -1,4 +1,4 @@
-name: Production — Build & Deploy
+name: Production — Build, Deploy & Release
 
 on:
   push:
@@ -6,21 +6,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # Release作成・tag pushに必要
   pages: write
   id-token: write
 
 concurrency:
   group: production
-  cancel-in-progress: false
+  cancel-in-progress: false   # 本番デプロイは中断しない
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      css_version: ${{ steps.build.outputs.css_version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0   # 全履歴取得 (release notes生成に必要)
 
       - uses: actions/setup-node@v4
         with:
@@ -31,7 +33,7 @@ jobs:
       - name: Lint (pre-build)
         run: npm run lint
 
-      # ─── HITL guard (production も同様に適用) ──────────────────────
+      # ─── HITL guard ────────────────────────────────────────────────
       - name: HITL — block direct push of template/design-system changes
         if: github.event_name == 'push'
         run: |
@@ -40,33 +42,46 @@ jobs:
             echo "No template/design-system changes — OK."
             exit 0
           fi
-
           COMMIT_MSG=$(git log -1 --format=%s)
           IS_MERGE=$(echo "$COMMIT_MSG" | grep -c '^Merge pull request' || true)
-
           if [ "$IS_MERGE" -eq 0 ]; then
-            echo "::error::🚫 HITL violation: templates/ or design-system/ were modified in a direct push."
+            echo "::error::🚫 HITL violation: templates/ or design-system/ modified via direct push."
             echo "$CHANGED" | sed 's/^/::error::  /'
             echo "::error::Use a PR. See GOVERNANCE.md."
             exit 1
           else
-            echo "✓ PR merge detected — template changes allowed."
+            echo "✓ PR merge — template changes allowed."
           fi
       # ───────────────────────────────────────────────────────────────
 
       - name: Build
-        run: npm run build
+        id: build
+        run: |
+          npm run build
+          # CSSバージョンをoutputに渡す (release notesに記載)
+          CSS_V=$(grep -oP '(?<=style\.css\?v=)[a-f0-9]+' dist/index.html | head -1)
+          echo "css_version=${CSS_V}" >> $GITHUB_OUTPUT
 
       - name: Lint (post-build)
         run: npm run lint
 
-      - name: Verify no unresolved placeholders in dist
+      - name: Verify no unresolved placeholders
         run: |
-          grep -rl '{{' dist/ && echo '::error::Unresolved placeholders found in dist!' && exit 1 || echo 'dist/ is clean.'
+          grep -rl '{{' dist/ && echo '::error::Unresolved placeholders found!' && exit 1 || echo 'dist/ is clean.'
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+      # dist.zip を Release用に保存
+      - name: Archive dist for Release
+        run: zip -r dist.zip dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-zip
+          path: dist.zip
+          retention-days: 90
 
   deploy:
     needs: build
@@ -77,3 +92,112 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v4
         id: deployment
+
+  release:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 日付ベースのタグを生成: v2026.03.12-1, v2026.03.12-2, ...
+      - name: Generate release tag
+        id: tag
+        run: |
+          DATE=$(date -u +%Y.%m.%d)
+          BASE="v${DATE}"
+          # 同日に既存タグがある場合は連番を増やす
+          N=1
+          while git tag -l "${BASE}-${N}" | grep -q .; do
+            N=$((N+1))
+          done
+          TAG="${BASE}-${N}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Generated tag: ${TAG}"
+
+      # 前回Releaseからの変更を収集してrelease notes生成
+      - name: Generate release notes
+        id: notes
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+            HEADER="Initial release"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+            HEADER="Changes since ${PREV_TAG}"
+          fi
+
+          COMMITS=$(git log ${RANGE} --pretty=format:"- %s (%h)" --no-merges | head -30)
+          CSS_V="${{ needs.build.outputs.css_version }}"
+
+          NOTES=$(cat << ENDNOTES
+          ## ${HEADER}
+
+          ${COMMITS}
+
+          ---
+          **Build info**
+          - CSS fingerprint: \`${CSS_V}\`
+          - Deployed: $(date -u +"%Y-%m-%d %H:%M UTC")
+          - Commit: \`${GITHUB_SHA:0:8}\`
+
+          **Rollback手順**
+          \`\`\`bash
+          gh release download ${{ steps.tag.outputs.tag }} -p "dist.zip"
+          unzip dist.zip
+          # → distをActionsに渡して再デプロイ
+          \`\`\`
+          ENDNOTES
+          )
+          # 改行をエスケープしてGITHUB_OUTPUTに渡す
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # dist.zip を download
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-zip
+
+      # タグを作成してRelease publish
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag   = '${{ steps.tag.outputs.tag }}';
+            const notes = `${{ steps.notes.outputs.notes }}`;
+            const fs    = require('fs');
+
+            // タグを作成
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              ref:   `refs/tags/${tag}`,
+              sha:   context.sha,
+            });
+
+            // Release を作成
+            const release = await github.rest.repos.createRelease({
+              owner:            context.repo.owner,
+              repo:             context.repo.repo,
+              tag_name:         tag,
+              name:             `Release ${tag}`,
+              body:             notes,
+              draft:            false,
+              prerelease:       false,
+              make_latest:      'true',
+            });
+
+            // dist.zip をアップロード
+            const zip = fs.readFileSync('dist.zip');
+            await github.rest.repos.uploadReleaseAsset({
+              owner:          context.repo.owner,
+              repo:           context.repo.repo,
+              release_id:     release.data.id,
+              name:           'dist.zip',
+              data:           zip,
+            });
+
+            console.log(`Release created: ${release.data.html_url}`);
