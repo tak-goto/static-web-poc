@@ -7,12 +7,29 @@ const fm         = require('front-matter');
 const CONTENT_DIR  = path.join(__dirname, 'content');
 const TEMPLATE_DIR = path.join(__dirname, 'templates');
 const DS_DIR       = path.join(__dirname, 'design-system');
+const PUBLIC_DIR   = path.join(__dirname, 'public');
 const DIST_DIR     = path.join(__dirname, 'dist');
 
 function readFile(p) { return fs.readFileSync(p, 'utf8'); }
 function ensureDir(p) { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); }
 
-// CSS の内容から 8文字のハッシュを生成 — キャッシュバスティング用
+// public/ を dist/ へ再帰コピー（画像・フォントなどの静的アセット）
+function copyPublic(src, dest) {
+  if (!fs.existsSync(src)) return;
+  ensureDir(dest);
+  fs.readdirSync(src).forEach(function(name) {
+    if (name === '.gitkeep') return;
+    var srcPath  = path.join(src, name);
+    var destPath = path.join(dest, name);
+    if (fs.statSync(srcPath).isDirectory()) {
+      copyPublic(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  });
+}
+
+// CSS の内容から 8 文字のハッシュを生成 — キャッシュバスティング用
 function cssFingerprint(css) {
   return crypto.createHash('sha256').update(css).digest('hex').slice(0, 8);
 }
@@ -76,7 +93,6 @@ function renderPage(contentPath, siteData, cssVersion) {
   var pageData = Object.assign({}, siteData, parsed.attributes, flat);
   pageData.page_title = pageData.title || pageData.site_name;
   pageData.body_html  = marked.parse(parsed.body);
-  // CSS参照にバージョンクエリを付与
   pageData.css_url    = 'assets/style.css?v=' + cssVersion;
 
   var html = readFile(path.join(TEMPLATE_DIR, 'base.html'));
@@ -94,11 +110,17 @@ function build() {
 
   var siteData = JSON.parse(readFile(path.join(CONTENT_DIR, 'site.json')));
 
+  // CSS
   var css = buildCSS();
   var cssVersion = cssFingerprint(css);
   fs.writeFileSync(path.join(DIST_DIR, 'assets', 'style.css'), css);
   console.log('  ✓ dist/assets/style.css  (v=' + cssVersion + ')');
 
+  // 静的アセット (public/ → dist/)
+  copyPublic(PUBLIC_DIR, DIST_DIR);
+  console.log('  ✓ dist/  ← public/ copied');
+
+  // ページ生成
   fs.writeFileSync(path.join(DIST_DIR, 'index.html'), renderPage(path.join(CONTENT_DIR, 'index.md'), siteData, cssVersion));
   console.log('  ✓ dist/index.html');
 
