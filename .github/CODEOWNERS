@@ -1,0 +1,15 @@
+# CODEOWNERS — Human-in-the-loop enforcement
+#
+# These paths require explicit review/approval before merge.
+# Protects design system and templates from unreviewed changes.
+
+# Template changes always require tak-goto's approval
+templates/                @tak-goto
+templates/components/     @tak-goto
+
+# Design system changes always require tak-goto's approval
+design-system/            @tak-goto
+
+# Workflow changes require approval (prevent privilege escalation)
+.github/workflows/        @tak-goto
+.github/CODEOWNERS        @tak-goto

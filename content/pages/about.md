@@ -1,9 +1,9 @@
 ---
 title: 会社概要
-meta_description: Acme Corpの会社概要ページです。
-template: page
-lead: 私たちのミッション、ビジョン、そしてチームについて。
+meta_description: Acme Corpの会社概要ページです。ミッション、沿革、チームについてお会いします。
 ---
+
+# 会社概要
 
 ## ミッション
 

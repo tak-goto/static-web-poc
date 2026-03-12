@@ -5,11 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="{{meta_description}}">
   <title>{{page_title}} | {{site_name}}</title>
-  <link rel="stylesheet" href="assets/style.css">
+
+  <!-- OGP / Twitter Card -->
+  <meta property="og:type"         content="{{og_type}}">
+  <meta property="og:title"        content="{{og_title}}">
+  <meta property="og:description"  content="{{og_description}}">
+  <meta property="og:url"          content="{{og_url}}">
+  <meta property="og:image"        content="{{og_image}}">
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="{{og_title}}">
+  <meta name="twitter:description" content="{{og_description}}">
+  <meta name="twitter:image"       content="{{og_image}}">
+
+  <!-- Canonical -->
+  <link rel="canonical" href="{{canonical_url}}">
+
+  <link rel="stylesheet" href="{{css_url}}">
 </head>
 <body>
   {{> header}}
-
   <main id="main">
     {{> hero}}
     <section class="section">
@@ -18,7 +32,6 @@
       </div>
     </section>
   </main>
-
   {{> footer}}
 </body>
 </html>

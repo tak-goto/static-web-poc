@@ -1,17 +1,19 @@
 {
   "site_name": "Acme Corp",
   "lang": "ja",
+  "base_url": "https://tak-goto.github.io/static-web-poc",
+  "og_default_image": "https://tak-goto.github.io/static-web-poc/images/og-default.png",
   "copyright": "© 2025 Acme Corp",
   "cta_label": "お問い合わせ",
   "cta_url": "contact.html",
   "nav_items": [
-    { "label": "サービス",   "url": "services.html" },
-    { "label": "会社概要",   "url": "about.html" },
-    { "label": "ニュース",   "url": "news.html" },
+    { "label": "サービス",     "url": "services.html" },
+    { "label": "会社概要",     "url": "about.html" },
+    { "label": "ニュース",     "url": "news.html" },
     { "label": "お問い合わせ", "url": "contact.html" }
   ],
   "footer_links": [
     { "label": "プライバシーポリシー", "url": "privacy.html" },
-    { "label": "お問い合わせ",       "url": "contact.html" }
+    { "label": "お問い合わせ",        "url": "contact.html" }
   ]
 }

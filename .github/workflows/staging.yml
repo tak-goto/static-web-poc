@@ -1,0 +1,79 @@
+name: Staging — Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: staging
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # HEAD~1 diff に必要
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - name: Lint (pre-build)
+        run: npm run lint
+
+      # ─── HITL guard ────────────────────────────────────────────────
+      # templates/ or design-system/ が変更されているとき、
+      # PRマージ経由でなければ即エラーで終了する。
+      # PRマージのコミットメッセージは "Merge pull request #" で始まる。
+      - name: HITL — block direct push of template/design-system changes
+        if: github.event_name == 'push'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | grep -E '^(templates/|design-system/)' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No template/design-system changes — OK."
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --format=%s)
+          IS_MERGE=$(echo "$COMMIT_MSG" | grep -c '^Merge pull request' || true)
+
+          if [ "$IS_MERGE" -eq 0 ]; then
+            echo "::error::🚫 HITL violation: templates/ or design-system/ were modified in a direct push."
+            echo "::error::Changed files:"
+            echo "$CHANGED" | sed 's/^/::error::  /'
+            echo "::error::These paths require a Pull Request with human review. See GOVERNANCE.md."
+            exit 1
+          else
+            echo "✓ PR merge detected — template changes allowed."
+          fi
+      # ───────────────────────────────────────────────────────────────
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint (post-build — check dist output)
+        run: npm run lint
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
