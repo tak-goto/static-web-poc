@@ -4,9 +4,17 @@ on:
   push:
     branches: [production]
   workflow_dispatch:
+    inputs:
+      rollback_tag:
+        description: |
+          ロールバック先のタグ（例: v2026.03.12-1）。
+          指定すると既存 dist.zip を再デプロイしビルドをスキップ。
+          空白のままにすると通常ビルド。
+        required: false
+        type: string
 
 permissions:
-  contents: write   # Release作成・tag pushに必要
+  contents: write   # Release作成・tag push に必要
   pages: write
   id-token: write
 
@@ -19,21 +27,55 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       css_version: ${{ steps.build.outputs.css_version }}
+      is_rollback: ${{ steps.rollback.outputs.is_rollback }}
+      rollback_tag: ${{ steps.rollback.outputs.rollback_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # 全履歴取得 (release notes生成に必要)
+          fetch-depth: 0   # 全履歴取得 (release notes・HITL guard に必要)
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - run: npm install
+      # ─── ロールバックモード判定 ────────────────────────────────────
+      - name: Check rollback mode
+        id: rollback
+        run: |
+          TAG="${{ github.event.inputs.rollback_tag }}"
+          if [ -n "$TAG" ]; then
+            echo "is_rollback=true"  >> $GITHUB_OUTPUT
+            echo "rollback_tag=${TAG}" >> $GITHUB_OUTPUT
+            echo "::notice::🔄 ROLLBACK MODE: restoring ${TAG}"
+          else
+            echo "is_rollback=false" >> $GITHUB_OUTPUT
+            echo "rollback_tag="     >> $GITHUB_OUTPUT
+            echo "::notice::🔨 BUILD MODE: normal build"
+          fi
+
+      # ─── ロールバック: dist.zip を GitHub Release から取得 ─────────
+      - name: Rollback — download dist.zip from Release
+        if: steps.rollback.outputs.is_rollback == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.rollback.outputs.rollback_tag }}"
+          echo "Downloading dist.zip from Release ${TAG}..."
+          gh release download "${TAG}" --pattern "dist.zip" --repo ${{ github.repository }}
+          unzip dist.zip
+          echo "Rollback dist/ ready."
+
+      # ─── 通常ビルド ────────────────────────────────────────────────
+      - name: Install dependencies
+        if: steps.rollback.outputs.is_rollback == 'false'
+        run: npm install
 
       - name: Lint (pre-build)
+        if: steps.rollback.outputs.is_rollback == 'false'
         run: npm run lint
 
-      # ─── HITL guard ────────────────────────────────────────────────
+      # HITL guard — push イベント時のみ実行
+      # workflow_dispatch 時はスキップ（ロールバック・手動再デプロイ用途のため）
       - name: HITL — block direct push of template/design-system changes
         if: github.event_name == 'push'
         run: |
@@ -52,20 +94,21 @@ jobs:
           else
             echo "✓ PR merge — template changes allowed."
           fi
-      # ───────────────────────────────────────────────────────────────
 
       - name: Build
         id: build
+        if: steps.rollback.outputs.is_rollback == 'false'
         run: |
           npm run build
-          # CSSバージョンをoutputに渡す (release notesに記載)
           CSS_V=$(grep -oP '(?<=style\.css\?v=)[a-f0-9]+' dist/index.html | head -1)
           echo "css_version=${CSS_V}" >> $GITHUB_OUTPUT
 
       - name: Lint (post-build)
+        if: steps.rollback.outputs.is_rollback == 'false'
         run: npm run lint
 
       - name: Verify no unresolved placeholders
+        if: steps.rollback.outputs.is_rollback == 'false'
         run: |
           grep -rl '{{' dist/ && echo '::error::Unresolved placeholders found!' && exit 1 || echo 'dist/ is clean.'
 
@@ -73,11 +116,13 @@ jobs:
         with:
           path: dist
 
-      # dist.zip を Release用に保存
+      # dist.zip を Release 用に保存（通常ビルド時のみ。ロールバック時は再添付不要）
       - name: Archive dist for Release
+        if: steps.rollback.outputs.is_rollback == 'false'
         run: zip -r dist.zip dist/
 
       - uses: actions/upload-artifact@v4
+        if: steps.rollback.outputs.is_rollback == 'false'
         with:
           name: dist-zip
           path: dist.zip
@@ -96,6 +141,8 @@ jobs:
   release:
     needs: [build, deploy]
     runs-on: ubuntu-latest
+    # ロールバック時は新規 Release を作成しない（既存タグを保持する）
+    if: needs.build.outputs.is_rollback == 'false'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -107,7 +154,6 @@ jobs:
         run: |
           DATE=$(date -u +%Y.%m.%d)
           BASE="v${DATE}"
-          # 同日に既存タグがある場合は連番を増やす
           N=1
           while git tag -l "${BASE}-${N}" | grep -q .; do
             N=$((N+1))
@@ -116,7 +162,7 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "Generated tag: ${TAG}"
 
-      # 前回Releaseからの変更を収集してrelease notes生成
+      # 前回 Release からの変更を収集して release notes 生成
       - name: Generate release notes
         id: notes
         run: |
@@ -128,10 +174,8 @@ jobs:
             RANGE="${PREV_TAG}..HEAD"
             HEADER="Changes since ${PREV_TAG}"
           fi
-
           COMMITS=$(git log ${RANGE} --pretty=format:"- %s (%h)" --no-merges | head -30)
           CSS_V="${{ needs.build.outputs.css_version }}"
-
           NOTES=$(cat << ENDNOTES
           ## ${HEADER}
 
@@ -144,24 +188,17 @@ jobs:
           - Commit: \`${GITHUB_SHA:0:8}\`
 
           **Rollback手順**
-          \`\`\`bash
-          gh release download ${{ steps.tag.outputs.tag }} -p "dist.zip"
-          unzip dist.zip
-          # → distをActionsに渡して再デプロイ
-          \`\`\`
+          Actions → production.yml → Run workflow → rollback_tag に このタグを入力
           ENDNOTES
           )
-          # 改行をエスケープしてGITHUB_OUTPUTに渡す
           echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES"     >> $GITHUB_OUTPUT
+          echo "EOF"        >> $GITHUB_OUTPUT
 
-      # dist.zip を download
       - uses: actions/download-artifact@v4
         with:
           name: dist-zip
 
-      # タグを作成してRelease publish
       - name: Create GitHub Release
         uses: actions/github-script@v7
         with:
@@ -170,7 +207,6 @@ jobs:
             const notes = `${{ steps.notes.outputs.notes }}`;
             const fs    = require('fs');
 
-            // タグを作成
             await github.rest.git.createRef({
               owner: context.repo.owner,
               repo:  context.repo.repo,
@@ -178,26 +214,24 @@ jobs:
               sha:   context.sha,
             });
 
-            // Release を作成
             const release = await github.rest.repos.createRelease({
-              owner:            context.repo.owner,
-              repo:             context.repo.repo,
-              tag_name:         tag,
-              name:             `Release ${tag}`,
-              body:             notes,
-              draft:            false,
-              prerelease:       false,
-              make_latest:      'true',
+              owner:       context.repo.owner,
+              repo:        context.repo.repo,
+              tag_name:    tag,
+              name:        `Release ${tag}`,
+              body:        notes,
+              draft:       false,
+              prerelease:  false,
+              make_latest: 'true',
             });
 
-            // dist.zip をアップロード
             const zip = fs.readFileSync('dist.zip');
             await github.rest.repos.uploadReleaseAsset({
-              owner:          context.repo.owner,
-              repo:           context.repo.repo,
-              release_id:     release.data.id,
-              name:           'dist.zip',
-              data:           zip,
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              release_id: release.data.id,
+              name:       'dist.zip',
+              data:       zip,
             });
 
             console.log(`Release created: ${release.data.html_url}`);
