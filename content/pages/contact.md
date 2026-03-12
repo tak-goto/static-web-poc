@@ -1,6 +1,6 @@
 ---
 title: お問い合わせ
-meta_description: Acme Corpへのお問い合わせはこちらから。メール・電話・所在地のご案内です。
+meta_description: Acme Corpへのお問い合わせはこちらから。メール・電話・所在地のご案内です。お気軽にご連絡ください。
 ---
 
 # お問い合わせ

@@ -2,7 +2,7 @@ name: PR Check — Lint & Build
 
 # Runs on every Pull Request to main or production.
 # Blocks merge if lint or build fails.
-# Detects template/design-system changes and adds HITL warning.
+# Detects template/design-system changes and posts HITL warning (once per PR).
 
 on:
   pull_request:
@@ -12,13 +12,18 @@ permissions:
   contents: read
   pull-requests: write
 
+# 同一PRへの連続pushで前のチェックをキャンセルする
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0   # full history for accurate diff
 
       - uses: actions/setup-node@v4
         with:
@@ -26,51 +31,81 @@ jobs:
 
       - run: npm install
 
-      - name: Lint
+      - name: Lint (pre-build)
         run: npm run lint
+
+      # ─── HITL detect & comment ────────────────────────────────────
+      # Buildより先に実行:lint/build errorがあってもテンプレート変更を警告できる。
+      # 既存コメントがあれば新規投稿せず更新する(重複防止)。
+      - name: HITL — Detect template / design-system changes
+        id: hitl
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "${BASE}...${HEAD}" | grep -E '^(templates/|design-system/)' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "hitl_required=true" >> $GITHUB_OUTPUT
+            FILES=$(echo "$CHANGED" | tr '\n' ' ')
+            echo "changed_files=${FILES}" >> $GITHUB_OUTPUT
+            echo '::warning::HITL required: template or design-system files changed'
+          else
+            echo "hitl_required=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: HITL — Post or update warning comment
+        if: steps.hitl.outputs.hitl_required == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- hitl-warning -->';
+            const files  = '${{ steps.hitl.outputs.changed_files }}';
+            const body = [
+              marker,
+              '## ⚠️ HITL Required — Template / Design System Changes Detected',
+              '',
+              'This PR modifies files that affect **all pages**. Human review is mandatory before merge.',
+              '',
+              '**Changed files:**',
+              '```',
+              files,
+              '```',
+              '',
+              '**Checklist before approving:**',
+              '- [ ] Preview has been checked visually',
+              '- [ ] Design tokens are not broken',
+              '- [ ] All pages render correctly',
+              '- [ ] Lint passes (check Actions tab)',
+            ].join('\n');
+
+            // 既存のHITLコメントを検索して更新、なければ新規作成
+            const { data: comments } = await github.rest.issues.listComments({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner:      context.repo.owner,
+                repo:       context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+              console.log('Updated existing HITL comment:', existing.id);
+            } else {
+              await github.rest.issues.createComment({
+                owner:        context.repo.owner,
+                repo:         context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+              console.log('Created new HITL comment');
+            }
+      # ───────────────────────────────────────────────────────────────
 
       - name: Build
         run: npm run build
 
       - name: Post-build lint
         run: npm run lint
-
-      - name: HITL — Detect template / design-system changes
-        id: hitl
-        run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^(templates/|design-system/)' || true)
-          if [ -n "$CHANGED" ]; then
-            echo "hitl_required=true" >> $GITHUB_OUTPUT
-            echo "changed_files=$CHANGED" >> $GITHUB_OUTPUT
-            echo '::warning::HITL required: template or design-system files changed'
-          else
-            echo "hitl_required=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: HITL — Comment on PR if templates changed
-        if: steps.hitl.outputs.hitl_required == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const files = `${{ steps.hitl.outputs.changed_files }}`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: [
-                '## ⚠️ HITL Required — Template / Design System Changes Detected',
-                '',
-                'This PR modifies files that affect **all pages**. Human review is mandatory before merge.',
-                '',
-                '**Changed files:**',
-                '```',
-                files,
-                '```',
-                '',
-                '**Checklist before approving:**',
-                '- [ ] Preview has been checked visually',
-                '- [ ] Design tokens are not broken',
-                '- [ ] All pages render correctly',
-                '- [ ] Lint passes (check Actions tab)',
-              ].join('\n')
-            });

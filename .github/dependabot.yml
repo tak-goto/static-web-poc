@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # ── GitHub Actions ────────────────────────────────────────
+  # Keeps action versions up to date for security patches.
+  # PRs targeting .github/workflows/ require @tak-goto review (CODEOWNERS).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(actions)"
+
+  # ── npm ───────────────────────────────────────────────────
+  # Keeps Node.js dependencies up to date.
+  # build.js / scripts/ changes require @tak-goto review (CODEOWNERS).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps)"
+    # 開発依存はメジャーバージョンアップのみ手動確認
+    versioning-strategy: "lockfile-only"

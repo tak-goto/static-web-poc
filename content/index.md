@@ -11,8 +11,6 @@ hero:
   secondary_cta_url: contact.html
 ---
 
-# Acme Corpについて
-
-## 私たちについて
+## Acme Corpについて
 
 Acme Corpは2010年創業。デザイン・エンジニアリング・コンサルティングを軸に、数百社のビジネス変革を支援してきました。
