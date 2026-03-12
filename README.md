@@ -14,8 +14,8 @@ Markdownベースの軽量静的CMSです。デザイントークン・テンプ
 6. [ローカル開発セットアップ](#5-ローカル開発セットアップ)
 7. [日常的なワークフロー](#6-日常的なワークフロー)
 8. [本番リリース手順](#7-本番リリース手順)
-9. [ファイル構成](#ファイル構成)
-10. [ロールバック手順](#ロールバック手順)
+9. [ロールバック手順](#8-ロールバック手順)
+10. [ファイル構成](#ファイル構成)
 
 ---
 
@@ -125,9 +125,12 @@ GitHub App を特定のリポジトリだけにインストールすることで
 
 ### 4-3. Branch Protection Rules
 
+> ⚠️ **この設定は必須です。設定が完了するまでは production への直接 push が可能な状態であり、**
+> **HITL guard（CI）のみが唯一の防衛線です。リポジトリ作成後すぐに設定してください。**
+
 **Settings** → **Branches** → **Add branch protection rule**
 
-**`production` ブランチ（厳格に保護）：**
+**`production` ブランチ：**
 
 | 設定 | 値 |
 |---|---|
@@ -135,12 +138,11 @@ GitHub App を特定のリポジトリだけにインストールすることで
 | Require a pull request before merging | ✅ |
 | Required number of approvals | `1` |
 | Require status checks to pass before merging | ✅ |
-| Required status checks | `lint-and-build`（pr-check.yml のジョブ名） |
+| Required status checks | `lint-and-build`（pr-check.yml のジョブ名と一致） |
 | Require branches to be up to date | ✅ |
 | Do not allow bypassing the above settings | ✅（管理者も含めて強制） |
 
-> ⚠️ **直接 push を禁止することで、必ず PR 経由のマージのみが production に入るようになります。**
-> production.yml の HITL guard はこれと二重になりますが、`workflow_dispatch` 手動起動のケースにも対応するため両方有効にします。
+この設定により production への push は PR マージ由来のみになり、production.yml が PRマージ後にのみ起動することが保証されます。
 
 **`main` ブランチ（推奨）：**
 
@@ -188,7 +190,7 @@ fix/*      ─┤──▶  main  ──▶（Staging 自動デプロイ）
 2. staging.yml が自動起動
      → Staging URL で目視確認
 
-3. 問題なければ → 本番リリース手順へ（下記セクション7）
+3. 問題なければ → 本番リリース手順へ（セクション 7）
 ```
 
 ### ページ追加
@@ -233,45 +235,52 @@ npm run preview
 | Git CLI | `cp image.webp public/images/ && git add && git push origin main` |
 | 外部 CDN | Markdown に URL を直接記載（リポジトリに置かない） |
 
-```markdown
-![説明テキスト](images/filename.webp)
-```
-
 ---
 
 ## 7. 本番リリース手順
 
 > **production ブランチへの直接 push は Branch Protection により禁止されています。**
-> **必ず `main → production` の Pull Request を作成・レビュー・マージしてください。**
+> **毎回リリースのたびに `main → production` の Pull Request を作成・レビュー・マージしてください。**
 
 ### ステップごとの手順
 
 ```
 Step 1  Staging 確認
-        └─ https://{user}.github.io/{repo}/ （staging 環境）で目視確認
+        └─ Staging URL で目視確認（staging.yml が main push 後に自動デプロイ）
 
 Step 2  PR 作成（main → production）
-        └─ GitHub UI または Claude 経由で作成
-           タイトル例: "Release v2026.03.12-1"
-           本文: 変更内容・確認チェックリストを記載
+        └─ GitHub UI または Claude 経由で PR を作成する
+           タイトル例: "Release v2026.03.12-2"
+           本文: main との差分（変更内容）・チェックリスト
 
-Step 3  PR レビュー・CI 確認
+Step 3  CI 確認・レビュー
         └─ pr-check.yml (lint-and-build) が ✅ になるまで待つ
-        └─ Approver（Required reviewers に設定したユーザー）が Approve
+        └─ Approver（Environment の Required reviewers）が Approve
 
-Step 4  Merge
-        └─ "Merge pull request" をクリック
-           ※ Squash merge / Rebase merge は HITL guard の検知に影響するため
-              通常の Merge commit を推奨
+Step 4  Merge（通常の Merge commit を使用）
+        └─ GitHub UI で "Merge pull request" をクリック
+           ⚠️ Squash merge・Rebase merge は使わない
+              → HITL guard が "Merge pull request" というコミットメッセージを
+                検知することで PR 経由を確認しているため
 
-Step 5  自動実行（production.yml）
-        ├─ lint → HITL guard（PR merge のため通過）→ build → lint
+Step 5  自動実行（production.yml が push イベントで起動）
+        ├─ lint → HITL guard（"Merge pull request" を検知して通過）→ build → lint
         ├─ GitHub Pages 本番デプロイ
         └─ GitHub Release 自動作成
-              tag: v{YYYY}.{MM}.{DD}-{n}（例: v2026.03.12-1）
+              tag: v{YYYY}.{MM}.{DD}-{n}（例: v2026.03.12-2）
               assets: dist.zip（ロールバック用）
               body: 前回 Release 以降の commit 一覧（自動生成）
 ```
+
+### HITL guard の挙動まとめ
+
+| トリガー | HITL guard | 備考 |
+|---|---|---|
+| PR マージ（通常 merge commit） | ✅ 実行・通過 | "Merge pull request" を検知 |
+| PR マージ（squash / rebase） | ❌ 実行・失敗 | templates/ 変更がある場合。content のみなら無関係 |
+| 直接 push（Branch Protection 有効） | 🚫 push 自体が禁止 | — |
+| 直接 push（Branch Protection 未設定） | ❌ 実行・失敗 | 暫定状態。早急に設定を完了する |
+| `workflow_dispatch`（手動実行） | ⏭ スキップ | ロールバック用途のため意図的にスキップ |
 
 ### Release の命名規則
 
@@ -284,9 +293,43 @@ v{YYYY}.{MM}.{DD}-{n}
 
 | 原因 | 対処 |
 |---|---|
-| lint エラー（unresolved変数など） | main で修正して push → PR が自動更新 |
-| SEO lint（title短すぎ等） | content/ を修正 |
-| HITL violation | templates/ を直接 push した場合は PR 経由にする |
+| lint エラー（unresolved 変数など） | main で修正して push → PR が自動更新 |
+| SEO lint（title 短すぎ等） | content/ を修正 |
+| HITL violation（direct push） | templates/ の変更を PR 経由にする |
+
+---
+
+## 8. ロールバック手順
+
+リリースごとに dist.zip が GitHub Release に保存されています。ビルドをスキップして直接再デプロイできます。
+
+### 手順
+
+```
+Step 1  リポジトリ → Releases タブ → ロールバックしたいバージョンのタグを確認
+        例: v2026.03.12-1
+
+Step 2  Actions → "Production — Build, Deploy & Release" → Run workflow
+        ├─ Branch: production
+        └─ rollback_tag（入力欄）: v2026.03.12-1  ← タグを入力
+
+Step 3  workflow が自動実行
+        ├─ ビルドをスキップ
+        ├─ Release から dist.zip をダウンロード・展開
+        ├─ GitHub Pages に再デプロイ
+        └─ 新規 Release は作成しない（既存タグを保持）
+```
+
+> **ロールバック時は HITL guard がスキップされます（`workflow_dispatch` イベントのため）。**
+> これは意図的な設計です。緊急時にレビューなしで即座に戻せることを優先しています。
+
+### CLI からロールバックする場合
+
+```bash
+gh workflow run production.yml \
+  --ref production \
+  --field rollback_tag=v2026.03.12-1
+```
 
 ---
 
@@ -312,23 +355,8 @@ scripts/lint.js        ← Linter（11項目: SEO・performance・template）
   workflows/
     staging.yml        ← main push → Staging 自動デプロイ + HITL guard
     production.yml     ← production PR merge → 本番デプロイ + Release 作成
+                          workflow_dispatch + rollback_tag でロールバック対応
     pr-check.yml       ← PR 時 lint-and-build + HITL コメント自動投稿
 GOVERNANCE.md          ← ブランチ戦略・運用ルール詳細
 CLAUDE.md              ← Claude 作業時のルール（preview 必須・HITL 対象）
 ```
-
----
-
-## ロールバック手順
-
-```bash
-# 1. ロールバックしたいバージョンの dist.zip を取得
-gh release download v2026.03.12-1 -p "dist.zip"
-unzip dist.zip -d rollback/
-
-# 2. Actions → production.yml → Run workflow（workflow_dispatch）
-#    で rollback/ の内容を手動デプロイ
-#    （または dist.zip を展開して production ブランチに PR）
-```
-
-リポジトリ → **Releases** タブから全バージョンの dist.zip を参照・ダウンロードできます。
