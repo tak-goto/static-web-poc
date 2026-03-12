@@ -64,7 +64,7 @@ jobs:
       - name: Lint (post-build — check dist output)
         run: npm run lint
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 

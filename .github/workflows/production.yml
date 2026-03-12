@@ -112,7 +112,7 @@ jobs:
         run: |
           grep -rl '{{' dist/ && echo '::error::Unresolved placeholders found!' && exit 1 || echo 'dist/ is clean.'
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
