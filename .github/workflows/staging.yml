@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: 2   # HEAD~1 diff に必要
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
 
