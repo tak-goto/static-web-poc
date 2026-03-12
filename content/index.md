@@ -1,16 +1,17 @@
 ---
 title: ホーム
-meta_description: Acme Corpの公式サイトです。
-template: home
+meta_description: Acme Corpの公式サイトです。デザイン・エンジニアリング・コンサルティングでお客様のビジネス変革を支援します。
 hero:
   eyebrow: Welcome
   heading: "未来をともに、つくる会社"
   lead: Acme Corpはテクノロジーとデザインで、お客様のビジネスを次のステージへ導きます。
-  primary_cta_label: サービスを見る
-  primary_cta_url: /services
-  secondary_cta_label: 会社概要
-  secondary_cta_url: /about
+  primary_cta_label: 会社概要を見る
+  primary_cta_url: about.html
+  secondary_cta_label: お問い合わせ
+  secondary_cta_url: contact.html
 ---
+
+# Acme Corpについて
 
 ## 私たちについて
 
