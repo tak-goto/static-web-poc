@@ -8,13 +8,13 @@ Markdownベースの軽量静的CMSです。デザイントークン・テンプ
 npm install
 ```
 
-## ローカルビルド
+## ローカルビルド（CIと等価）
 
 ```bash
-npm run preview   # lint → build → lint (CI と完全に同一)
+npm run preview   # lint → build → lint
 ```
 
-`dist/` に出力されます。
+`dist/` に出力されます。CSSはビルドごとにハッシュが付与され、ブラウザキャッシュが自動的に無効化されます（`style.css?v=xxxxxxxx`）。
 
 ## ページ追加
 
@@ -41,12 +41,17 @@ feature/* ─┐
 fix/*      ─┘
 ```
 
-| branch | 役割 | デプロイ |
-|---|---|---|
-| `main` | 開発・統合 | Staging 自動 |
-| `production` | 本番リリース | GitHub Pages 本番 |
+| branch | 役割 | デプロイ | 直接push |
+|---|---|---|---|
+| `main` | 開発・統合 | Staging 自動 | ✅ content/ のみ |
+| `production` | 本番リリース | GitHub Pages 本番 | ❌ PRのみ |
 
 詳細は [GOVERNANCE.md](GOVERNANCE.md) を参照。
+
+## HITL ルール
+
+`templates/` または `design-system/` への変更は **PRが必須** です。
+直接pushするとCI（staging.yml）が失敗します。
 
 ## ファイル構成
 
@@ -61,6 +66,16 @@ templates/        ← ⚠️ HITL必須 — 変更はPR経由で
 design-system/    ← ⚠️ HITL必須 — 変更はPR経由で
   tokens.css
   base.css
-build.js          ← ビルドスクリプト
+build.js          ← ビルドスクリプト（CSSハッシュ生成を含む）
 scripts/lint.js   ← テンプレートlinter
+docs/             ← セットアップ・設計ドキュメント
+  SETUP_GITHUB_MCP.md  ← GitHub MCP + Claude.ai 連携手順
 ```
+
+## GitHub MCP 連携
+
+Claude.ai からこのリポジトリを直接操作する設定手順は  
+[docs/SETUP_GITHUB_MCP.md](docs/SETUP_GITHUB_MCP.md) を参照してください。
+
+GitHub App の作成・インストール・Claude.ai 側の Client ID / Secret 設定まで  
+必要なすべての手順をまとめています。
