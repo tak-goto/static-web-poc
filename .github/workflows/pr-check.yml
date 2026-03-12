@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0   # full history for accurate diff
 
       - uses: actions/setup-node@v4
         with:
@@ -26,22 +26,23 @@ jobs:
 
       - run: npm install
 
-      - name: Lint
+      - name: Lint (pre-build)
         run: npm run lint
 
-      - name: Build
-        run: npm run build
-
-      - name: Post-build lint
-        run: npm run lint
-
+      # ─── HITL detect & comment ────────────────────────────────────
+      # Build より先に実行することで、lint/build error があっても
+      # templates/ 変更の警告を PR にコメントできる。
       - name: HITL — Detect template / design-system changes
         id: hitl
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^(templates/|design-system/)' || true)
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "${BASE}...${HEAD}" | grep -E '^(templates/|design-system/)' || true)
           if [ -n "$CHANGED" ]; then
-            echo "hitl_required=true" >> $GITHUB_OUTPUT
-            echo "changed_files=$CHANGED" >> $GITHUB_OUTPUT
+            echo "hitl_required=true"  >> $GITHUB_OUTPUT
+            # 改行をスペースに変換してGITHUB_OUTPUT に渡す
+            FILES=$(echo "$CHANGED" | tr '\n' ' ')
+            echo "changed_files=${FILES}" >> $GITHUB_OUTPUT
             echo '::warning::HITL required: template or design-system files changed'
           else
             echo "hitl_required=false" >> $GITHUB_OUTPUT
@@ -52,7 +53,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const files = `${{ steps.hitl.outputs.changed_files }}`;
+            const files = '${{ steps.hitl.outputs.changed_files }}';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -74,3 +75,10 @@ jobs:
                 '- [ ] Lint passes (check Actions tab)',
               ].join('\n')
             });
+      # ───────────────────────────────────────────────────────────────
+
+      - name: Build
+        run: npm run build
+
+      - name: Post-build lint
+        run: npm run lint
