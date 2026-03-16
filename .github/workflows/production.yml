@@ -30,7 +30,7 @@ jobs:
       is_rollback: ${{ steps.rollback.outputs.is_rollback }}
       rollback_tag: ${{ steps.rollback.outputs.rollback_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0   # 全履歴取得 (release notes・HITL guard に必要)
 
@@ -144,7 +144,7 @@ jobs:
     # ロールバック時は新規 Release を作成しない（既存タグを保持する）
     if: needs.build.outputs.is_rollback == 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
